@@ -1,8 +1,8 @@
 <?php
 
+use App\Http\Controllers\Admin\LawController as AdminLawController;
 use App\Http\Controllers\Admin\AdminChatController;
 use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
-use App\Http\Controllers\Admin\LawController as AdminLawController;
 use App\Http\Controllers\Admin\OpinionsController as AdminOpinionsController;
 use App\Http\Controllers\Admin\UsageController as AdminUsageController;
 use App\Http\Controllers\Admin\UsersController as AdminUsersController;
@@ -65,8 +65,10 @@ Route::middleware(['auth', 'can:admin'])->prefix('admin')->name('admin.')->group
     Route::get('/opinions', [AdminOpinionsController::class, 'index'])->name('opinions.index');
     Route::get('/opinions/create', [AdminOpinionsController::class, 'create'])->name('opinions.create');
     Route::post('/opinions', [AdminOpinionsController::class, 'store'])->name('opinions.store');
-
-    Route::resource('laws', AdminLawController::class);
+    Route::get('/laws', [AdminLawController::class, 'index'])->name('laws.index');
+    Route::post('/laws/upload', [AdminLawController::class, 'upload'])->name('laws.upload');
+    Route::patch('/laws/{law}', [AdminLawController::class, 'update'])->name('laws.update');
+    Route::delete('/laws/{law}', [AdminLawController::class, 'destroy'])->name('laws.destroy');
 });
 
 Route::middleware('auth')->group(function () {

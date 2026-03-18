@@ -1,5 +1,7 @@
 @php
     $isPro = ($theme ?? '') === 'pro';
+    $dashboardMode = (bool) ($dashboardMode ?? false);
+    $dashboardCollapsed = $dashboardMode && (!($activeConversation ?? null) || ($messages ?? collect())->isEmpty());
 @endphp
 
 <style>
@@ -8,63 +10,31 @@
     }
 
     .chat-panel {
-        backdrop-filter: blur(24px);
-        background: {{ $isPro ? '#13132b' : 'rgba(255, 255, 255, 0.82)' }};
-        box-shadow: {{ $isPro ? '0 25px 50px -12px rgba(0, 0, 0, 0.5)' : '0 24px 80px rgba(15, 23, 42, 0.08)' }};
-        border: {{ $isPro ? '1px solid rgba(255, 255, 255, 0.05)' : '1px solid rgba(255, 255, 255, 0.7)' }};
-        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        backdrop-filter: blur(18px);
+        background: {{ $isPro ? 'rgba(255, 255, 255, 0.03)' : 'rgba(255, 255, 255, 0.82)' }};
+        box-shadow: {{ $isPro ? '0 8px 32px 0 rgba(0, 0, 0, 0.37)' : '0 24px 80px rgba(15, 23, 42, 0.08)' }};
+        border: {{ $isPro ? '1px solid rgba(255, 255, 255, 0.1)' : '1px solid rgba(255, 255, 255, 0.7)' }};
     }
 
-    .pro-input-wrapper {
-        background: rgba(255, 255, 255, 0.03);
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        border-radius: 1.5rem;
-        transition: all 0.3s ease;
-    }
-
-    .pro-input-wrapper:focus-within {
+    .pro-input {
         background: rgba(255, 255, 255, 0.05);
-        border-color: #6366f1;
-        box-shadow: 0 0 30px rgba(99, 102, 241, 0.15);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        color: white;
     }
 
-    .message-bubble-user {
-        background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
-        box-shadow: 0 10px 30px -5px rgba(99, 102, 241, 0.4);
-    }
-
-    .message-bubble-ai {
-        background: rgba(255, 255, 255, 0.03);
-        border: 1px solid rgba(255, 255, 255, 0.06);
-        backdrop-filter: blur(10px);
+    .pro-input:focus {
+        background: rgba(255, 255, 255, 0.08);
+        border-color: rgba(255, 255, 255, 0.2);
+        box-shadow: none;
     }
 
     .chat-scrollbar::-webkit-scrollbar {
-        width: 5px;
+        width: 6px;
     }
 
     .chat-scrollbar::-webkit-scrollbar-thumb {
-        background: {{ $isPro ? 'rgba(255, 255, 255, 0.08)' : 'rgba(148, 163, 184, 0.45)' }};
+        background: {{ $isPro ? 'rgba(255, 255, 255, 0.1)' : 'rgba(148, 163, 184, 0.45)' }};
         border-radius: 999px;
-    }
-
-    .chat-scrollbar::-webkit-scrollbar-thumb:hover {
-        background: {{ $isPro ? 'rgba(255, 255, 255, 0.15)' : 'rgba(148, 163, 184, 0.6)' }};
-    }
-
-    @keyframes pulse-glow {
-        0%, 100% { opacity: 0.5; transform: scale(1); }
-        50% { opacity: 0.8; transform: scale(1.05); }
-    }
-
-    .glow-dot {
-        position: absolute;
-        width: 4px;
-        height: 4px;
-        background: #6366f1;
-        border-radius: 50%;
-        filter: blur(2px);
-        animation: pulse-glow 2s infinite;
     }
 
     .chat-scrollbar::-webkit-scrollbar-track {
@@ -89,170 +59,155 @@
 </style>
 
 <div class="chat-shell {{ $isPro ? '' : 'min-h-[calc(100vh-4rem)] px-4 py-4 sm:px-6 lg:px-8' }}">
-    <div class="mx-auto flex h-[calc(100vh-16rem)] {{ $isPro ? 'max-w-full' : 'max-w-[1700px]' }} flex-col gap-4 lg:flex-row">
-        <aside class="chat-panel flex w-full shrink-0 flex-col overflow-hidden rounded-[2.5rem] lg:w-[380px]">
-            <div class="border-b {{ $isPro ? 'border-white/5' : 'border-slate-200/70' }} p-8">
-                <div class="flex items-center justify-between mb-8">
-                    <div>
-                        <div class="text-[10px] font-black uppercase tracking-[0.2em] {{ $isPro ? 'text-indigo-400' : 'text-sky-600' }}">Workspace</div>
-                        <h1 class="mt-1 text-2xl font-black tracking-tight {{ $isPro ? 'text-white' : 'text-slate-950' }}">Conversations</h1>
-                    </div>
-                    <div class="h-10 w-10 flex items-center justify-center rounded-xl {{ $isPro ? 'bg-white/5 text-slate-400' : 'bg-slate-100 text-slate-600' }}">
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-5 w-5">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 20.25c4.97 0 9-3.694 9-8.25s-4.03-8.25-9-8.25S3 7.444 3 12c0 2.104.859 4.023 2.273 5.48.432.447.74 1.04.586 1.641a4.483 4.483 0 01-.923 1.785A5.969 5.969 0 006 21c1.282 0 2.47-.402 3.445-1.087.81.22 1.668.337 2.555.337z" />
-                        </svg>
-                    </div>
-                </div>
-
-                <form method="POST" action="{{ route('conversations.store') }}">
-                    @csrf
-                    <button type="submit" class="group relative flex w-full items-center justify-center gap-3 rounded-2xl {{ $isPro ? 'bg-indigo-600 hover:bg-indigo-500 shadow-lg shadow-indigo-600/20' : 'bg-slate-950 hover:bg-slate-800' }} px-6 py-4 text-sm font-bold text-white transition-all duration-300 hover:-translate-y-1">
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="h-4 w-4 transition-transform group-hover:rotate-90">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-                        </svg>
-                        <span>New Conversation</span>
-                    </button>
-                </form>
-
-                <div class="mt-6 flex rounded-2xl {{ $isPro ? 'bg-white/[0.03] p-1.5' : 'bg-slate-100 p-1' }} text-xs font-bold uppercase tracking-widest">
-                    <a href="{{ route($indexRoute ?? 'chat.index') }}" class="flex-1 rounded-xl px-4 py-3 text-center transition-all duration-300 {{ $mode === 'all' ? ($isPro ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20' : 'bg-white text-slate-950 shadow-sm') : ($isPro ? 'text-slate-500 hover:text-slate-300' : 'text-slate-500 hover:text-slate-900') }}">
-                        All
-                    </a>
-                    <a href="{{ route($savedRoute ?? 'chat.saved') }}" class="flex-1 rounded-xl px-4 py-3 text-center transition-all duration-300 {{ $mode === 'saved' ? ($isPro ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20' : 'bg-white text-slate-950 shadow-sm') : ($isPro ? 'text-slate-500 hover:text-slate-300' : 'text-slate-500 hover:text-slate-900') }}">
-                        Saved
-                    </a>
-                </div>
-            </div>
-
-            <div class="chat-scrollbar flex-1 space-y-3 overflow-y-auto p-6">
-                @forelse ($conversations as $conversation)
-                    <a
-                        href="{{ route($showRoute ?? 'chat.show', $conversation) }}"
-                        class="{{ $activeConversation && $activeConversation->id === $conversation->id ? ($isPro ? 'bg-indigo-600/10 border-indigo-500/30 text-white ring-1 ring-indigo-500/20 shadow-[0_0_20px_rgba(99,102,241,0.1)]' : 'border-slate-900 bg-slate-950 text-white shadow-[0_18px_40px_rgba(15,23,42,0.16)]') : ($isPro ? 'border-white/5 bg-white/[0.02] text-slate-400 hover:border-white/10 hover:bg-white/[0.04] hover:text-slate-200' : 'border-transparent bg-white/60 text-slate-900 hover:border-slate-200 hover:bg-white') }} group relative block rounded-[1.5rem] border px-6 py-5 transition-all duration-500"
-                    >
-                        @if($activeConversation && $activeConversation->id === $conversation->id && $isPro)
-                            <div class="absolute inset-y-4 left-0 w-1 rounded-full bg-indigo-500 shadow-[0_0_10px_rgba(99,102,241,0.5)]"></div>
-                        @endif
-                        <div class="flex items-start justify-between gap-4">
-                            <div class="min-w-0">
-                                <div class="truncate text-sm font-bold tracking-tight">
-                                    {{ $conversation->title ?: 'Untitled Thread' }}
-                                </div>
-                                <div class="mt-1.5 flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest {{ $activeConversation && $activeConversation->id === $conversation->id ? ($isPro ? 'text-blue-400/80' : 'text-slate-300') : ($isPro ? 'text-slate-600' : 'text-slate-400') }}">
-                                    <span>{{ ($conversation->last_message_at ?: $conversation->created_at)->diffForHumans() }}</span>
-                                </div>
-                            </div>
-                            @if ($conversation->is_saved)
-                                <div class="{{ $activeConversation && $activeConversation->id === $conversation->id ? 'text-blue-400' : 'text-amber-500/50' }}">
-                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="h-4 w-4">
-                                        <path fill-rule="evenodd" d="M6.32 2.577a4.915 4.915 0 015.68 0l.73.492a1.325 1.325 0 001.54 0l.73-.492a4.915 4.915 0 015.68 0l.16.108a1.325 1.325 0 01.62 1.111v14.733a1.325 1.325 0 01-2.14 1.051l-5.68-4.46a1.325 1.325 0 00-1.54 0l-5.68 4.46a1.325 1.325 0 01-2.14-1.051V3.796a1.325 1.325 0 01.62-1.111l.16-.108z" clip-rule="evenodd" />
-                                    </svg>
-                                </div>
-                            @endif
-                        </div>
-                    </a>
-                @empty
-                    <div class="rounded-3xl border border-dashed {{ $isPro ? 'border-white/10 bg-white/5' : 'border-slate-200 bg-white/70' }} px-5 py-10 text-center">
-                        <p class="text-sm font-medium {{ $isPro ? 'text-white' : 'text-slate-900' }}">No conversations yet</p>
-                        <p class="mt-2 text-sm leading-6 {{ $isPro ? 'text-white/40' : 'text-slate-500' }}">Create your first thread to start asking about DILG opinions and legal references.</p>
-                    </div>
-                @endforelse
-            </div>
-        </aside>
-
-        <section class="chat-panel flex min-w-0 flex-1 flex-col overflow-hidden rounded-[2.5rem]">
-            <div class="border-b {{ $isPro ? 'border-white/5' : 'border-slate-200/70' }} p-8">
-                <div class="flex flex-col gap-6 xl:flex-row xl:items-center xl:justify-between">
-                    <div class="min-w-0 flex-1">
-                        <div class="flex flex-wrap items-center gap-3 mb-4">
-                            <span class="flex items-center gap-2 rounded-full {{ $isPro ? 'bg-indigo-500/10 text-indigo-400 ring-1 ring-indigo-500/20 shadow-[0_0_15px_rgba(99,102,241,0.1)]' : 'bg-sky-50 text-sky-700' }} px-4 py-1.5 text-[10px] font-black uppercase tracking-[0.2em]">
-                                <div class="glow-dot relative"></div>
-                                Live Session
-                            </span>
-                            @if ($activeConversation && $activeConversation->is_saved)
-                                <span class="rounded-full {{ $isPro ? 'bg-amber-500/10 text-amber-400 ring-1 ring-amber-500/20' : 'bg-amber-50 text-amber-700' }} px-4 py-1.5 text-[10px] font-black uppercase tracking-[0.2em]">Archived</span>
-                            @endif
+    <div class="mx-auto flex h-[calc(100vh-16rem)] {{ $isPro ? 'max-w-full' : 'max-w-[1700px]' }} flex-col">
+        <section class="chat-panel flex min-w-0 flex-1 flex-col overflow-hidden rounded-[32px]">
+            <div id="chat-header" class="border-b {{ $isPro ? 'border-white/5' : 'border-slate-200/70' }} px-5 py-5 sm:px-7 {{ $dashboardCollapsed ? 'hidden' : '' }}">
+                <div class="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
+                    <div class="min-w-0">
+                        <div class="flex flex-wrap items-center gap-2">
+                            <span class="rounded-full {{ $isPro ? 'bg-blue-500/10 text-blue-400' : 'bg-sky-50 text-sky-700' }} px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em]">Active thread</span>
+                            <span id="chat-saved-badge" class="rounded-full {{ $isPro ? 'bg-amber-500/10 text-amber-400' : 'bg-amber-50 text-amber-700' }} px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] {{ ($activeConversation && $activeConversation->is_saved) ? '' : 'hidden' }}">Saved</span>
                         </div>
 
-                        @if ($activeConversation)
-                            <form method="POST" action="{{ route('conversations.update', $activeConversation) }}" class="flex max-w-4xl items-center gap-4">
+                        <div id="chat-header-active" class="{{ $activeConversation ? '' : 'hidden' }}">
+                            <form id="chat-rename-form" method="POST" action="{{ $activeConversation ? route('conversations.update', $activeConversation) : '#' }}" class="mt-4 flex max-w-3xl flex-col gap-3 sm:flex-row">
                                 @csrf
                                 @method('PATCH')
-                                <div class="relative flex-1 group">
-                                    <div class="{{ $isPro ? 'pro-input-wrapper' : '' }}">
-                                        <input
-                                            name="title"
-                                            value="{{ old('title', $activeConversation->title) }}"
-                                            class="w-full border-0 bg-transparent px-6 py-4 text-xl font-black tracking-tight {{ $isPro ? 'text-white placeholder:text-slate-600 focus:ring-0' : 'border-slate-200 bg-white/90 focus:border-sky-500 focus:ring-sky-500' }} shadow-sm"
-                                            placeholder="Untitled Session"
-                                        >
-                                    </div>
-                                    <div class="absolute inset-x-6 bottom-0 h-px bg-gradient-to-r from-transparent via-blue-500/50 to-transparent opacity-0 group-focus-within:opacity-100 transition-opacity"></div>
-                                </div>
-                                <button type="submit" class="shrink-0 rounded-2xl border {{ $isPro ? 'border-white/10 bg-white/5 text-white hover:bg-blue-600 hover:border-blue-500 shadow-lg hover:shadow-blue-600/20' : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50' }} px-8 py-4 text-sm font-black uppercase tracking-widest transition-all duration-300 hover:-translate-y-1">
+                                <input
+                                    id="chat-title-input"
+                                    name="title"
+                                    value="{{ old('title', $activeConversation?->title) }}"
+                                    class="w-full rounded-2xl {{ $isPro ? 'pro-input' : 'border-slate-200 bg-white/90 focus:border-sky-500 focus:ring-sky-500' }} px-4 py-3 text-base font-semibold shadow-sm"
+                                    placeholder="Untitled chat"
+                                >
+                                <button type="submit" class="rounded-2xl border {{ $isPro ? 'border-white/10 bg-white/5 text-white hover:bg-white/10' : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50' }} px-5 py-3 text-sm font-semibold transition">
                                     Rename
                                 </button>
                             </form>
-                        @else
-                            <h2 class="text-4xl font-black tracking-tight {{ $isPro ? 'text-white' : 'text-slate-950' }}">Intelligence Hub</h2>
-                            <p class="mt-2 text-slate-500 font-medium">Select a conversation or start a new inquiry to begin research.</p>
-                        @endif
+                            <p class="mt-3 text-sm {{ $isPro ? 'text-white/40' : 'text-slate-500' }}">Conversation #<span id="chat-conversation-id">{{ $activeConversation?->id }}</span> · Keep titles specific so retrieval stays organized.</p>
+                        </div>
+                        <div id="chat-header-empty" class="{{ $activeConversation ? 'hidden' : '' }}">
+                            <h2 class="mt-4 text-3xl font-semibold tracking-tight {{ $isPro ? 'text-white' : 'text-slate-950' }}">Start a new conversation</h2>
+                            <p class="mt-2 max-w-2xl text-sm leading-6 {{ $isPro ? 'text-white/50' : 'text-slate-500' }}">Ask about a statute, opinion, or administrative issue. Responses will appear here in a cleaner threaded view.</p>
+                        </div>
                     </div>
 
-                    @if ($activeConversation)
-                        <div class="flex items-center gap-3">
-                            <form method="POST" action="{{ route('conversations.toggle-save', $activeConversation) }}">
+                    <div id="chat-header-actions" class="flex flex-wrap items-center gap-2 {{ $activeConversation ? '' : 'hidden' }}">
+                            <form id="chat-save-form" method="POST" action="{{ $activeConversation ? route('conversations.toggle-save', $activeConversation) : '#' }}">
                                 @csrf
-                                <button type="submit" class="h-14 px-6 rounded-2xl border {{ $isPro ? 'border-white/10 bg-white/5 text-slate-300 hover:text-white hover:bg-white/10' : 'border-slate-200 bg-white text-slate-700' }} text-sm font-bold transition-all duration-300">
-                                    {{ $activeConversation->is_saved ? 'Unarchive' : 'Archive' }}
+                                <button id="chat-save-button" type="submit" class="rounded-2xl border {{ $isPro ? 'border-white/10 bg-white/5 text-white hover:bg-white/10' : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50' }} px-4 py-3 text-sm font-semibold transition">
+                                    {{ $activeConversation && $activeConversation->is_saved ? 'Remove from Saved' : 'Save Conversation' }}
                                 </button>
                             </form>
-                            <form method="POST" action="{{ route('conversations.destroy', $activeConversation) }}" onsubmit="return confirm('Delete this conversation?')">
+                            <form id="chat-delete-form" method="POST" action="{{ $activeConversation ? route('conversations.destroy', $activeConversation) : '#' }}" onsubmit="return confirm('Delete this conversation?')">
                                 @csrf
                                 @method('DELETE')
-                                <button type="submit" class="h-14 w-14 flex items-center justify-center rounded-2xl border {{ $isPro ? 'border-rose-500/20 bg-rose-500/5 text-rose-500 hover:bg-rose-500 hover:text-white shadow-lg hover:shadow-rose-500/20' : 'border-rose-200 bg-rose-50 text-rose-700' }} transition-all duration-300">
-                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-5 w-5">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-1.806A2.25 2.25 0 0013.813 1.5h-3.626a2.25 2.25 0 00-2.25 2.25V3m7.5 0H9" />
-                                    </svg>
+                                <button type="submit" class="rounded-2xl border {{ $isPro ? 'border-rose-500/20 bg-rose-500/10 text-rose-400 hover:bg-rose-500/20' : 'border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100' }} px-4 py-3 text-sm font-semibold transition">
+                                    Delete
                                 </button>
                             </form>
-                        </div>
-                    @endif
+                    </div>
                 </div>
             </div>
 
-            <div id="chat-scroll" class="chat-scrollbar flex-1 overflow-y-auto p-8">
-                @if ($messages->isEmpty())
-                    <div class="flex h-full flex-col items-center justify-center text-center">
-                        <div class="relative mb-8">
-                            <div class="absolute inset-0 bg-indigo-500 blur-[40px] opacity-20 animate-pulse"></div>
-                            <div class="relative flex h-24 w-24 items-center justify-center rounded-[2rem] {{ $isPro ? 'bg-gradient-to-br from-indigo-500 to-purple-600' : 'bg-slate-950' }} shadow-2xl">
-                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-10 w-10 text-white">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
-                                </svg>
+            <div id="chat-scroll" class="chat-scrollbar flex-1 overflow-y-auto px-4 py-5 sm:px-6 lg:px-8">
+                @if ($dashboardMode && $dashboardCollapsed)
+                    <div id="dashboard-cards" class="mx-auto w-full max-w-6xl pt-2 opacity-100 translate-y-0 transition-all duration-300">
+                        <div class="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+                            <div class="rounded-2xl bg-blue-500/10 p-6 ring-1 ring-blue-500/20 backdrop-blur-sm">
+                                <div class="flex items-center gap-3">
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-8 w-8 text-blue-400">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.898 20.562L16.5 21.75l-.398-1.188a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.188-.398a2.25 2.25 0 001.423-1.423L16.5 15.75l.398 1.188a2.25 2.25 0 001.423 1.423L19.5 18.75l-1.188.398a2.25 2.25 0 00-1.423 1.423z" />
+                                    </svg>
+                                    <h3 class="text-lg font-semibold text-white">Legal AI Assistant</h3>
+                                </div>
+                                <p class="mt-2 text-sm text-white/60">Access the ChatGPT-style legal AI interface for research and drafting.</p>
+                            </div>
+                            <div class="rounded-2xl bg-white/5 p-6 ring-1 ring-white/10 backdrop-blur-sm">
+                                <div class="flex items-center gap-3">
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-8 w-8">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M8.625 12a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H8.25m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H12m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 01-2.555-.337A5.972 5.972 0 015.41 20.97a5.969 5.969 0 01-.474-.065 4.48 4.48 0 00.978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25z" />
+                                    </svg>
+                                    <h3 class="text-lg font-semibold">AI Chatbot</h3>
+                                </div>
+                                <p class="mt-2 text-sm text-white/60">Create text for ads, emails, and content instantly.</p>
+                            </div>
+                            <div class="rounded-2xl bg-white/5 p-6 ring-1 ring-white/10 backdrop-blur-sm">
+                                <div class="flex items-center gap-3">
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-8 w-8">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.898 20.562L16.5 21.75l-.398-1.188a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.188-.398a2.25 2.25 0 001.423-1.423L16.5 15.75l.398 1.188a2.25 2.25 0 001.423 1.423L19.5 18.75l-1.188.398a2.25 2.25 0 00-1.423 1.423z" />
+                                    </svg>
+                                    <h3 class="text-lg font-semibold">Artwork Generation</h3>
+                                </div>
+                                <p class="mt-2 text-sm text-white/60">Design unique visuals with AI creativity.</p>
+                            </div>
+                            <div class="rounded-2xl bg-white/5 p-6 ring-1 ring-white/10 backdrop-blur-sm">
+                                <div class="flex items-center gap-3">
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-8 w-8">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
+                                    </svg>
+                                    <h3 class="text-lg font-semibold">Research</h3>
+                                </div>
+                                <p class="mt-2 text-sm text-white/60">Find, summarize, and organize info fast.</p>
+                            </div>
+                            <div class="rounded-2xl bg-white/5 p-6 ring-1 ring-white/10 backdrop-blur-sm">
+                                <div class="flex items-center gap-3">
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-8 w-8">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+                                    </svg>
+                                    <h3 class="text-lg font-semibold">Generate Article</h3>
+                                </div>
+                                <p class="mt-2 text-sm text-white/60">Write articles or blogs in seconds.</p>
+                            </div>
+                            <div class="rounded-2xl bg-white/5 p-6 ring-1 ring-white/10 backdrop-blur-sm">
+                                <div class="flex items-center gap-3">
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-8 w-8">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3v18h16.5V3H3.75zm.75 16.5V4.5h15v15h-15z" />
+                                    </svg>
+                                    <h3 class="text-lg font-semibold">Data Analytics</h3>
+                                </div>
+                                <p class="mt-2 text-sm text-white/60">Turn data into clear insights with LYRA AI.</p>
+                            </div>
+                            <div class="rounded-2xl bg-white/5 p-6 ring-1 ring-white/10 backdrop-blur-sm">
+                                <div class="flex items-center gap-3">
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-8 w-8">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 7.5l3 2.25-3 2.25m4.5 0h3m-9 8.25h13.5A2.25 2.25 0 0021 18V6a2.25 2.25 0 00-2.25-2.25H5.25A2.25 2.25 0 003 6v12a2.25 2.25 0 002.25 2.25z" />
+                                    </svg>
+                                    <h3 class="text-lg font-semibold">Dev Mode</h3>
+                                </div>
+                                <p class="mt-2 text-sm text-white/60">Generate and refine code effortlessly.</p>
                             </div>
                         </div>
-                        <h3 class="text-3xl font-black tracking-tight {{ $isPro ? 'text-white' : 'text-slate-950' }}">AI Legal Intelligence</h3>
-                        <p class="mt-4 max-w-md text-lg text-slate-500 font-medium leading-relaxed">Ask anything about DILG opinions, local statutes, or procurement laws. Our AI is ready to assist.</p>
+                    </div>
+                @elseif ($messages->isEmpty())
+                    <div class="flex h-full items-center justify-center">
+                        <div class="max-w-2xl rounded-[28px] border border-dashed {{ $isPro ? 'border-white/10 bg-white/5' : 'border-slate-200 bg-white/80' }} px-8 py-10 text-center shadow-sm">
+                            <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl {{ $isPro ? 'bg-blue-600' : 'bg-slate-950' }} text-lg font-semibold text-white">AI</div>
+                            <h3 class="mt-5 text-2xl font-semibold tracking-tight {{ $isPro ? 'text-white' : 'text-slate-950' }}">Ready for legal research</h3>
+                            <p class="mt-3 text-sm leading-7 {{ $isPro ? 'text-white/50' : 'text-slate-500' }}">Draft a question below to search DILG materials, clarify administrative rules, or summarize legal guidance in a more polished workspace.</p>
+                        </div>
                     </div>
                 @else
-                    <div data-message-stack="true" class="mx-auto flex w-full max-w-5xl flex-col gap-10">
+                    <div data-message-stack="true" class="mx-auto flex w-full max-w-5xl flex-col gap-6">
                         @foreach ($messages as $message)
                             <div class="message-enter {{ $message->role === 'user' ? 'ml-auto max-w-2xl' : 'mr-auto max-w-3xl' }}">
-                                <div class="mb-4 flex items-center gap-4 px-2 {{ $message->role === 'user' ? 'flex-row-reverse text-right' : '' }}">
-                                    <div class="shrink-0 {{ $message->role === 'user' ? ($isPro ? 'bg-gradient-to-br from-indigo-500 to-purple-600 shadow-lg shadow-indigo-500/20' : 'bg-slate-950') : ($isPro ? 'bg-white/10 ring-1 ring-white/10' : 'bg-sky-100') }} flex h-10 w-10 items-center justify-center rounded-xl text-[10px] font-black uppercase tracking-widest text-white">
+                                <div class="mb-2 flex items-center gap-3 px-1">
+                                    <div class="{{ $message->role === 'user' ? ($isPro ? 'bg-blue-600 text-white' : 'bg-slate-950 text-white') : ($isPro ? 'bg-white/10 text-blue-400' : 'bg-sky-100 text-sky-800') }} flex h-9 w-9 items-center justify-center rounded-2xl text-xs font-semibold uppercase tracking-[0.18em]">
                                         {{ $message->role === 'user' ? 'You' : 'AI' }}
                                     </div>
-                                    <div class="min-w-0">
-                                        <div class="text-xs font-black uppercase tracking-[0.2em] {{ $isPro ? 'text-white' : 'text-slate-900' }}">{{ $message->role === 'user' ? 'You' : 'LYRA Assistant' }}</div>
-                                        <div class="text-[10px] font-bold text-slate-600 uppercase tracking-widest mt-0.5">
-                                            {{ $message->created_at->format('h:i A') }}
+                                    <div>
+                                        <div class="text-sm font-semibold {{ $isPro ? 'text-white' : 'text-slate-900' }}">{{ $message->role === 'user' ? 'You' : 'Assistant' }}</div>
+                                        <div class="text-xs {{ $isPro ? 'text-white/30' : 'text-slate-400' }}">
+                                            {{ $message->created_at->format('M d, Y h:i A') }}
+                                            @if ($message->role === 'assistant' && $message->model)
+                                                · {{ $message->model }}
+                                            @endif
                                         </div>
                                     </div>
                                 </div>
 
-                                <div class="{{ $message->role === 'user' ? ($isPro ? 'rounded-[2rem_2rem_0.5rem_2rem] message-bubble-user text-white' : 'rounded-[2rem_2rem_0.5rem_2rem] bg-slate-950 text-white') : ($isPro ? 'rounded-[2rem_2rem_2rem_0.5rem] message-bubble-ai text-white/90' : 'rounded-[2rem_2rem_2rem_0.5rem] border border-slate-200 bg-white text-slate-800 shadow-sm') }} px-8 py-6 shadow-2xl">
-                                    <div class="whitespace-pre-wrap text-[15px] leading-relaxed font-medium tracking-wide">{{ $message->content }}</div>
+                                <div class="{{ $message->role === 'user' ? ($isPro ? 'rounded-[28px_28px_8px_28px] bg-blue-600 text-white shadow-lg' : 'rounded-[28px_28px_8px_28px] bg-slate-950 text-white shadow-[0_24px_40px_rgba(15,23,42,0.18)]') : ($isPro ? 'rounded-[28px_28px_28px_8px] border border-white/5 bg-white/5 text-white/90' : 'rounded-[28px_28px_28px_8px] border border-slate-200/80 bg-white text-slate-800 shadow-sm') }} px-5 py-4 sm:px-6">
+                                    <div class="whitespace-pre-wrap text-sm leading-7 sm:text-[15px]">{{ $message->content }}</div>
                                 </div>
                             </div>
                         @endforeach
@@ -260,33 +215,33 @@
                 @endif
             </div>
 
-            <div class="border-t {{ $isPro ? 'border-white/5 bg-white/[0.01]' : 'border-slate-200/70 bg-white/70' }} p-8">
+            <div class="border-t {{ $isPro ? 'border-white/5 bg-white/5' : 'border-slate-200/70 bg-white/70' }} px-4 py-4 sm:px-6 lg:px-8">
                 <form
                     id="chat-form"
-                    class="mx-auto flex w-full max-w-5xl flex-col gap-4"
+                    class="mx-auto flex w-full max-w-5xl flex-col gap-3"
                     data-create-url="{{ route('conversations.store') }}"
                     data-messages-url="{{ $activeConversation ? route('messages.store', $activeConversation) : '' }}"
                     data-active-conversation-url="{{ $activeConversation ? route($showRoute ?? 'chat.show', $activeConversation) : '' }}"
+                    data-show-base="{{ preg_replace('/0$/', '', route($showRoute ?? 'chat.show', 0)) }}"
+                    data-dashboard-mode="{{ $dashboardMode ? '1' : '0' }}"
+                    data-preserve-url="{{ $dashboardMode ? '1' : '0' }}"
                 >
-                    <div class="group relative overflow-hidden {{ $isPro ? 'pro-input-wrapper' : 'rounded-[2.5rem] border border-slate-200 bg-white' }} transition-all duration-500">
+                    <div class="overflow-hidden rounded-[28px] border {{ $isPro ? 'border-white/10 bg-white/5' : 'border-slate-200 bg-white shadow-[0_14px_40px_rgba(15,23,42,0.06)]' }}">
                         <textarea
                             id="chat-prompt"
                             rows="3"
-                            class="w-full resize-none border-0 bg-transparent px-8 py-6 text-base font-medium {{ $isPro ? 'text-white placeholder:text-slate-600 focus:ring-0' : 'text-slate-800 placeholder:text-slate-400' }}"
-                            placeholder="Type your legal inquiry here..."
+                            class="w-full resize-none border-0 bg-transparent px-5 py-4 text-[15px] {{ $isPro ? 'text-white placeholder:text-white/30' : 'text-slate-800 placeholder:text-slate-400' }} focus:ring-0"
+                            placeholder="Ask about RA 9003, procurement rules, DILG opinions, or draft a legal summary..."
                         ></textarea>
-                        <div class="flex items-center justify-between border-t {{ $isPro ? 'border-white/5' : 'border-slate-100' }} px-8 py-5">
-                            <p class="text-[10px] font-black uppercase tracking-[0.2em] {{ $isPro ? 'text-slate-600' : 'text-slate-400' }}">Neural Engine Active</p>
-                            <button id="chat-send" type="submit" class="group flex items-center gap-3 rounded-2xl {{ $isPro ? 'bg-indigo-600 hover:bg-indigo-500 shadow-lg shadow-indigo-600/20' : 'bg-slate-950 hover:bg-slate-800' }} px-8 py-3.5 text-[11px] font-black uppercase tracking-[0.2em] text-white transition-all duration-300 hover:-translate-y-1">
-                                <span>Send Inquiry</span>
-                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="h-4 w-4 transition-transform group-hover:translate-x-1">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.76 0 013.27 20.876L5.999 12zm0 0h7.5" />
-                                </svg>
+                        <div class="flex flex-col gap-3 border-t {{ $isPro ? 'border-white/5' : 'border-slate-100' }} px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+                            <p class="text-xs uppercase tracking-[0.22em] {{ $isPro ? 'text-white/30' : 'text-slate-400' }}">Shift + Enter for a new line</p>
+                            <button id="chat-send" type="submit" class="inline-flex items-center justify-center rounded-2xl {{ $isPro ? 'bg-blue-600 hover:bg-blue-500' : 'bg-slate-950 hover:bg-slate-800' }} px-5 py-3 text-sm font-semibold text-white transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50">
+                                Send Message
                             </button>
                         </div>
                     </div>
                 </form>
-                <div id="chat-error" class="mx-auto hidden w-full max-w-5xl mt-4 rounded-2xl border border-rose-500/20 bg-rose-500/10 px-6 py-4 text-sm font-bold text-rose-400"></div>
+                <div id="chat-error" class="mx-auto hidden w-full max-w-5xl rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700"></div>
             </div>
         </section>
     </div>
@@ -299,36 +254,94 @@
     const scrollEl = document.getElementById('chat-scroll');
     const errorEl = document.getElementById('chat-error');
     const isPro = @json($isPro);
+    const isDashboard = form.dataset.dashboardMode === '1';
+    const preserveUrl = form.dataset.preserveUrl === '1';
+    const showBase = form.dataset.showBase || '';
+    const headerEl = document.getElementById('chat-header');
+    const headerActiveEl = document.getElementById('chat-header-active');
+    const headerEmptyEl = document.getElementById('chat-header-empty');
+    const headerActionsEl = document.getElementById('chat-header-actions');
+    const savedBadgeEl = document.getElementById('chat-saved-badge');
+    const renameFormEl = document.getElementById('chat-rename-form');
+    const titleInputEl = document.getElementById('chat-title-input');
+    const conversationIdEl = document.getElementById('chat-conversation-id');
+    const saveFormEl = document.getElementById('chat-save-form');
+    const saveButtonEl = document.getElementById('chat-save-button');
+    const deleteFormEl = document.getElementById('chat-delete-form');
+    const dashboardCardsEl = document.getElementById('dashboard-cards');
+    let dashboardTransitioned = false;
+
+    const buildConversationUrls = (conversationId) => {
+        const base = (form.dataset.createUrl || '').replace(/\/$/, '');
+        const updateUrl = `${base}/${conversationId}`;
+        const messagesUrl = `${updateUrl}/messages`;
+        const showUrl = showBase ? `${showBase}${conversationId}` : (form.dataset.activeConversationUrl || '');
+        const toggleSaveUrl = `${updateUrl}/toggle-save`;
+        return { updateUrl, messagesUrl, showUrl, toggleSaveUrl };
+    };
+
+    const setActiveConversationHeader = (conversationId, titleSeed) => {
+        if (!headerEl) return;
+
+        headerEl.classList.remove('hidden');
+        headerEmptyEl?.classList.add('hidden');
+        headerActiveEl?.classList.remove('hidden');
+        headerActionsEl?.classList.remove('hidden');
+
+        if (savedBadgeEl) savedBadgeEl.classList.add('hidden');
+        if (saveButtonEl) saveButtonEl.textContent = 'Save Conversation';
+
+        if (conversationIdEl) conversationIdEl.textContent = String(conversationId);
+        if (titleInputEl && typeof titleSeed === 'string') {
+            titleInputEl.value = titleSeed;
+        }
+
+        const urls = buildConversationUrls(conversationId);
+        if (renameFormEl) renameFormEl.action = urls.updateUrl;
+        if (saveFormEl) saveFormEl.action = urls.toggleSaveUrl;
+        if (deleteFormEl) deleteFormEl.action = urls.updateUrl;
+    };
+
+    const hideDashboardCards = () => {
+        if (!isDashboard || dashboardTransitioned || !dashboardCardsEl) return;
+        dashboardTransitioned = true;
+        dashboardCardsEl.classList.add('opacity-0', 'translate-y-2', 'pointer-events-none');
+        setTimeout(() => {
+            dashboardCardsEl.classList.add('hidden');
+        }, 280);
+    };
 
     const renderMessage = (role, content) => {
         const container = document.createElement('div');
         container.className = 'message-enter ' + (role === 'user' ? 'ml-auto max-w-2xl' : 'mr-auto max-w-3xl');
 
         const meta = document.createElement('div');
-        meta.className = 'mb-4 flex items-center gap-4 px-2 ' + (role === 'user' ? 'flex-row-reverse text-right' : '');
+        meta.className = 'mb-2 flex items-center gap-3 px-1';
 
         const avatar = document.createElement('div');
         if (isPro) {
             avatar.className = (role === 'user'
-                ? 'bg-gradient-to-br from-indigo-500 to-purple-600 shadow-lg shadow-indigo-500/20'
-                : 'bg-white/10 ring-1 ring-white/10') + ' shrink-0 flex h-10 w-10 items-center justify-center rounded-xl text-[10px] font-black uppercase tracking-widest text-white';
+                ? 'bg-blue-600 text-white'
+                : 'bg-white/10 text-blue-400') + ' flex h-9 w-9 items-center justify-center rounded-2xl text-xs font-semibold uppercase tracking-[0.18em]';
         } else {
             avatar.className = (role === 'user'
                 ? 'bg-slate-950 text-white'
-                : 'bg-sky-100 text-sky-800') + ' flex h-10 w-10 items-center justify-center rounded-xl text-[10px] font-black uppercase tracking-widest';
+                : 'bg-sky-100 text-sky-800') + ' flex h-9 w-9 items-center justify-center rounded-2xl text-xs font-semibold uppercase tracking-[0.18em]';
         }
         avatar.textContent = role === 'user' ? 'You' : 'AI';
 
         const metaText = document.createElement('div');
-        metaText.className = 'min-w-0';
 
         const label = document.createElement('div');
-        label.className = 'text-xs font-black uppercase tracking-[0.2em] ' + (isPro ? 'text-white' : 'text-slate-900');
-        label.textContent = role === 'user' ? 'You' : 'LYRA Assistant';
+        label.className = 'text-sm font-semibold ' + (isPro ? 'text-white' : 'text-slate-900');
+        label.textContent = role === 'user' ? 'You' : 'Assistant';
 
         const stamp = document.createElement('div');
-        stamp.className = 'text-[10px] font-bold text-slate-600 uppercase tracking-widest mt-0.5';
-        stamp.textContent = new Date().toLocaleTimeString([], {
+        stamp.className = 'text-xs ' + (isPro ? 'text-white/30' : 'text-slate-400');
+        stamp.textContent = new Date().toLocaleString([], {
+            month: 'short',
+            day: '2-digit',
+            year: 'numeric',
             hour: '2-digit',
             minute: '2-digit',
         });
@@ -341,16 +354,16 @@
         const bubble = document.createElement('div');
         if (isPro) {
             bubble.className = (role === 'user'
-                ? 'rounded-[2rem_2rem_0.5rem_2rem] message-bubble-user text-white'
-                : 'rounded-[2rem_2rem_2rem_0.5rem] message-bubble-ai text-white/90') + ' px-8 py-6 shadow-2xl';
+                ? 'rounded-[28px_28px_8px_28px] bg-blue-600 text-white shadow-lg'
+                : 'rounded-[28px_28px_28px_8px] border border-white/5 bg-white/5 text-white/90') + ' px-5 py-4 sm:px-6';
         } else {
             bubble.className = (role === 'user'
-                ? 'rounded-[2rem_2rem_0.5rem_2rem] bg-slate-950 text-white shadow-lg'
-                : 'rounded-[2rem_2rem_2rem_0.5rem] border border-slate-200/80 bg-white text-slate-800 shadow-sm') + ' px-8 py-6';
+                ? 'rounded-[28px_28px_8px_28px] bg-slate-950 text-white shadow-[0_24px_40px_rgba(15,23,42,0.18)]'
+                : 'rounded-[28px_28px_28px_8px] border border-slate-200/80 bg-white text-slate-800 shadow-sm') + ' px-5 py-4 sm:px-6';
         }
 
         const body = document.createElement('div');
-        body.className = 'whitespace-pre-wrap text-[15px] leading-relaxed font-medium tracking-wide';
+        body.className = 'whitespace-pre-wrap text-sm leading-7 sm:text-[15px]';
         body.textContent = content;
 
         bubble.appendChild(body);
@@ -362,7 +375,7 @@
             scrollEl.innerHTML = '';
             stack = document.createElement('div');
             stack.dataset.messageStack = 'true';
-            stack.className = 'mx-auto flex w-full max-w-5xl flex-col gap-10';
+            stack.className = 'mx-auto flex w-full max-w-5xl flex-col gap-6';
             scrollEl.appendChild(stack);
         }
 
@@ -374,20 +387,29 @@
         scrollEl.scrollTop = scrollEl.scrollHeight;
     };
 
-    const ensureConversation = async () => {
+    const ensureConversation = async (titleSeed) => {
         const existingUrl = form.dataset.activeConversationUrl;
         const existingMessagesUrl = form.dataset.messagesUrl;
 
         if (existingUrl && existingMessagesUrl) {
-            return { url: existingUrl, messagesUrl: existingMessagesUrl };
+            return { url: existingUrl, messagesUrl: existingMessagesUrl, id: null };
         }
 
         const resp = await window.axios.post(form.dataset.createUrl, {}, { headers: { Accept: 'application/json' } });
-        form.dataset.activeConversationUrl = resp.data.url;
+        const conversationId = resp.data.id;
+        const showUrl = showBase ? `${showBase}${conversationId}` : resp.data.url;
+        form.dataset.activeConversationUrl = showUrl;
         form.dataset.messagesUrl = resp.data.messages_url;
-        window.history.replaceState({}, '', resp.data.url);
 
-        return { url: resp.data.url, messagesUrl: resp.data.messages_url };
+        if (!preserveUrl) {
+            window.history.replaceState({}, '', showUrl);
+        }
+
+        if (conversationId) {
+            setActiveConversationHeader(conversationId, titleSeed);
+        }
+
+        return { url: showUrl, messagesUrl: resp.data.messages_url, id: conversationId };
     };
 
     form.addEventListener('submit', async (e) => {
@@ -402,12 +424,18 @@
         sendBtn.disabled = true;
         promptEl.disabled = true;
 
+        if (isDashboard) {
+            hideDashboardCards();
+            headerEl?.classList.remove('hidden');
+        }
+
         renderMessage('user', prompt);
         promptEl.value = '';
         scrollToBottom();
 
         try {
-            const conv = await ensureConversation();
+            const titleSeed = prompt.length > 60 ? prompt.slice(0, 60) : prompt;
+            const conv = await ensureConversation(titleSeed);
             const resp = await window.axios.post(conv.messagesUrl, { prompt }, { headers: { Accept: 'application/json' } });
             renderMessage('assistant', resp.data.assistant_message.content);
             scrollToBottom();

@@ -15,15 +15,24 @@ class ConversationController extends Controller
             'last_message_at' => now(),
         ]);
 
+        $previousPath = (string) (parse_url(url()->previous(), PHP_URL_PATH) ?? '');
+        $isAdmin = (bool) ($request->user()?->is_admin);
+        $showRoute = $isAdmin ? 'admin.legal.ai.show' : 'chat.show';
+        $indexRoute = $isAdmin ? 'admin.dashboard' : 'chat.index';
+
         if ($request->wantsJson()) {
             return response()->json([
                 'id' => $conversation->id,
-                'url' => route('chat.show', $conversation),
+                'url' => route($showRoute, $conversation),
                 'messages_url' => route('messages.store', $conversation),
             ]);
         }
 
-        return redirect()->route('chat.show', $conversation);
+        if ($isAdmin && str_contains($previousPath, '/admin/legal-ai')) {
+            return redirect()->route($showRoute, $conversation);
+        }
+
+        return redirect()->route($indexRoute);
     }
 
     public function update(Request $request, Conversation $conversation)
@@ -60,6 +69,17 @@ class ConversationController extends Controller
         abort_unless($conversation->user_id === $request->user()->id, 404);
 
         $conversation->delete();
+
+        $previousPath = (string) (parse_url(url()->previous(), PHP_URL_PATH) ?? '');
+        $isAdmin = (bool) ($request->user()?->is_admin);
+
+        if ($isAdmin && str_contains($previousPath, '/admin/legal-ai')) {
+            return redirect()->route('admin.legal.ai');
+        }
+
+        if ($isAdmin) {
+            return redirect()->route('admin.dashboard');
+        }
 
         return redirect()->route('chat.index');
     }

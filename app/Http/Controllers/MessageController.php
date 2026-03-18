@@ -7,7 +7,6 @@ use App\Models\AiRequest;
 use App\Models\Conversation;
 use App\Models\Message;
 use App\Services\GeminiChatClient;
-use App\Services\LawRetriever;
 use App\Services\OpenAiChatClient;
 use App\Services\OpinionRetriever;
 use Illuminate\Http\Request;
@@ -15,7 +14,7 @@ use Illuminate\Support\Str;
 
 class MessageController extends Controller
 {
-    public function store(Request $request, Conversation $conversation, OpenAiChatClient $client, OpinionRetriever $retriever, LawRetriever $lawRetriever)
+    public function store(Request $request, Conversation $conversation, OpenAiChatClient $client, OpinionRetriever $retriever)
     {
         abort_unless($conversation->user_id === $request->user()->id, 404);
 
@@ -68,16 +67,6 @@ class MessageController extends Controller
             }
             $context = "Use the following DILG Opinions as primary references. Prefer direct citations with titles and reference numbers. If unsure, say so.\n\n".implode("\n", $lines);
             $preface = trim($preface) !== '' ? ($preface."\n\n".$context) : $context;
-        }
-
-        $laws = $lawRetriever->retrieve($prompt, 3);
-        if (count($laws) > 0) {
-            $lawLines = [];
-            foreach ($laws as $law) {
-                $lawLines[] = "- {$law['title']} ({$law['number']}, {$law['year']}): " . Str::limit($law['full_text'], 2000);
-            }
-            $lawContext = "Also consider the following Law documents from our library:\n\n" . implode("\n", $lawLines);
-            $preface = trim($preface) !== '' ? ($preface . "\n\n" . $lawContext) : $lawContext;
         }
 
         if ($preface !== '') {

@@ -3,165 +3,61 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\Law;
 use Illuminate\Http\Request;
+
+use App\Models\Law;
 use Illuminate\Support\Facades\Storage;
-use Smalot\PdfParser\Parser;
 
 class LawController extends Controller
 {
-    public function index(Request $request)
+    public function index()
     {
-        $query = Law::query();
-
-        if ($request->filled('search')) {
-            $search = $request->search;
-            $query->where(function($q) use ($search) {
-                $q->where('title', 'like', "%{$search}%")
-                  ->orWhere('law_number', 'like', "%{$search}%")
-                  ->orWhere('content_text', 'like', "%{$search}%");
-            });
-        }
-
-        if ($request->filled('year')) {
-            $query->where('year', $request->year);
-        }
-
-        if ($request->filled('category')) {
-            $query->where('category', $request->category);
-        }
-
-        $laws = $query->latest()->paginate(10);
-        
-        $years = Law::select('year')->distinct()->orderBy('year', 'desc')->pluck('year');
-        $categories = Law::select('category')->distinct()->whereNotNull('category')->pluck('category');
-
-        return view('admin.laws.index', compact('laws', 'years', 'categories'));
+        $laws = Law::orderByDesc('created_at')->paginate(15);
+        return view('admin.laws.index', compact('laws'));
     }
 
-    public function create()
-    {
-        return view('admin.laws.create');
-    }
-
-    public function store(Request $request)
+    public function upload(Request $request)
     {
         $request->validate([
-            'title' => 'required|string|max:255',
-            'law_number' => 'required|string|max:255',
-            'year' => 'required|integer',
-            'category' => 'nullable|string|max:255',
-            'description' => 'nullable|string',
-            'file' => 'required|file|mimes:pdf,doc,docx,txt|max:10240',
+            'documents.*' => 'required|file|mimes:pdf,docx,zip|max:20480',
         ]);
 
-        $file = $request->file('file');
-        $year = $request->year;
-        $path = $file->storeAs("public/laws/{$year}", $file->getClientOriginalName());
-        
-        $contentText = $this->extractText($file);
+        if ($request->hasFile('documents')) {
+            foreach ($request->file('documents') as $file) {
+                $path = $file->store('law-documents', 'public');
+                
+                Law::create([
+                    'title' => $file->getClientOriginalName(),
+                    'file_path' => $path,
+                ]);
+            }
+        }
 
-        Law::create([
-            'title' => $request->title,
-            'law_number' => $request->law_number,
-            'year' => $year,
-            'category' => $request->category,
-            'description' => $request->description,
-            'file_path' => $path,
-            'content_text' => $contentText,
-        ]);
-
-        return redirect()->route('admin.laws.index')->with('success', 'Law uploaded and processed successfully.');
-    }
-
-    public function edit(Law $law)
-    {
-        return view('admin.laws.edit', compact('law'));
+        return back()->with('success', 'Documents uploaded successfully!');
     }
 
     public function update(Request $request, Law $law)
     {
         $request->validate([
             'title' => 'required|string|max:255',
-            'law_number' => 'required|string|max:255',
-            'year' => 'required|integer',
-            'category' => 'nullable|string|max:255',
-            'description' => 'nullable|string',
-            'file' => 'nullable|file|mimes:pdf,doc,docx,txt|max:10240',
         ]);
 
-        $data = [
+        $law->update([
             'title' => $request->title,
-            'law_number' => $request->law_number,
-            'year' => $request->year,
-            'category' => $request->category,
-            'description' => $request->description,
-        ];
+        ]);
 
-        if ($request->hasFile('file')) {
-            // Delete old file
-            if (Storage::exists($law->file_path)) {
-                Storage::delete($law->file_path);
-            }
-
-            $file = $request->file('file');
-            $year = $request->year;
-            $path = $file->storeAs("public/laws/{$year}", $file->getClientOriginalName());
-            
-            $data['file_path'] = $path;
-            $data['content_text'] = $this->extractText($file);
-        }
-
-        $law->update($data);
-
-        return redirect()->route('admin.laws.index')->with('success', 'Law updated successfully.');
+        return back()->with('success', 'Document title updated!');
     }
 
     public function destroy(Law $law)
     {
-        if (Storage::exists($law->file_path)) {
-            Storage::delete($law->file_path);
+        // Delete physical file
+        if (Storage::disk('public')->exists($law->file_path)) {
+            Storage::disk('public')->delete($law->file_path);
         }
 
         $law->delete();
 
-        return redirect()->route('admin.laws.index')->with('success', 'Law deleted successfully.');
-    }
-
-    private function extractText($file)
-    {
-        $extension = $file->getClientOriginalExtension();
-        $text = '';
-
-        try {
-            if ($extension === 'pdf') {
-                $parser = new Parser();
-                $pdf = $parser->parseFile($file->getPathname());
-                $text = $pdf->getText();
-            } elseif ($extension === 'txt') {
-                $text = file_get_contents($file->getPathname());
-            } elseif ($extension === 'docx') {
-                $text = $this->extractDocxText($file->getPathname());
-            }
-            // Add more parsers if needed for .doc
-        } catch (\Exception $e) {
-            \Log::error('Text extraction failed: ' . $e->getMessage());
-        }
-
-        return $text;
-    }
-
-    private function extractDocxText($filePath)
-    {
-        $content = '';
-        $zip = new \ZipArchive();
-        if ($zip->open($filePath) === true) {
-            if (($index = $zip->locateName('word/document.xml')) !== false) {
-                $xml = $zip->getFromIndex($index);
-                $content = strip_tags($xml);
-            }
-            $zip->close();
-        }
-        return $content;
+        return back()->with('success', 'Document deleted successfully!');
     }
 }

@@ -14,12 +14,7 @@ return new class extends Migration
         Schema::create('laws', function (Blueprint $table) {
             $table->id();
             $table->string('title');
-            $table->string('law_number');
-            $table->string('category')->nullable();
-            $table->integer('year');
-            $table->text('description')->nullable();
             $table->string('file_path');
-            $table->longText('content_text')->nullable();
             $table->timestamps();
         });
     }
