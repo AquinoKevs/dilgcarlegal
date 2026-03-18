@@ -1,8 +1,8 @@
 <?php
 
+use App\Http\Controllers\Admin\LawController as AdminLawController;
 use App\Http\Controllers\Admin\AdminChatController;
 use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
-use App\Http\Controllers\Admin\LawController as AdminLawController;
 use App\Http\Controllers\Admin\OpinionsController as AdminOpinionsController;
 use App\Http\Controllers\Admin\UsageController as AdminUsageController;
 use App\Http\Controllers\Admin\UsersController as AdminUsersController;
@@ -63,9 +63,19 @@ Route::middleware(['auth', 'can:admin'])->prefix('admin')->name('admin.')->group
     Route::get('/users', [AdminUsersController::class, 'index'])->name('users.index');
     Route::patch('/users/{user}', [AdminUsersController::class, 'update'])->name('users.update');
     Route::get('/usage', [AdminUsageController::class, 'index'])->name('usage.index');
+<<<<<<< HEAD
     Route::resource('opinions', AdminOpinionsController::class);
 
     Route::resource('laws', AdminLawController::class);
+=======
+    Route::get('/opinions', [AdminOpinionsController::class, 'index'])->name('opinions.index');
+    Route::get('/opinions/create', [AdminOpinionsController::class, 'create'])->name('opinions.create');
+    Route::post('/opinions', [AdminOpinionsController::class, 'store'])->name('opinions.store');
+    Route::get('/laws', [AdminLawController::class, 'index'])->name('laws.index');
+    Route::post('/laws/upload', [AdminLawController::class, 'upload'])->name('laws.upload');
+    Route::patch('/laws/{law}', [AdminLawController::class, 'update'])->name('laws.update');
+    Route::delete('/laws/{law}', [AdminLawController::class, 'destroy'])->name('laws.destroy');
+>>>>>>> 34036aaff8a4409a974abde8df238722cec97ddb
 });
 
 Route::middleware('auth')->group(function () {

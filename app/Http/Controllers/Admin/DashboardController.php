@@ -6,10 +6,11 @@ use App\Http\Controllers\Controller;
 use App\Models\AiRequest;
 use App\Models\Conversation;
 use App\Models\User;
+use Illuminate\Http\Request;
 
 class DashboardController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
         $since = now()->subDay();
 
@@ -22,8 +23,20 @@ class DashboardController extends Controller
             'tokens_24h' => (int) AiRequest::where('created_at', '>=', $since)->sum('total_tokens'),
         ];
 
+        $user = $request->user();
+        $activeConversation = $user->conversations()
+            ->orderByDesc('last_message_at')
+            ->orderByDesc('id')
+            ->first();
+
+        $messages = $activeConversation
+            ? $activeConversation->messages()->orderBy('id')->get()
+            : collect();
+
         return view('admin.dashboard', [
             'stats' => $stats,
+            'activeConversation' => $activeConversation,
+            'messages' => $messages,
         ]);
     }
 }

@@ -9,13 +9,5 @@ class Law extends Model
 {
     use HasFactory;
 
-    protected $fillable = [
-        'title',
-        'law_number',
-        'category',
-        'year',
-        'description',
-        'file_path',
-        'content_text',
-    ];
+    protected $fillable = ['title', 'file_path'];
 }

@@ -20,7 +20,7 @@ class AdminChatController extends Controller
 
         $activeConversation = $conversations->first();
         $messages = $activeConversation
-            ? $activeConversation->messages()->orderBy('id')->get()
+            ? $activeConversation->messages // Access the already loaded messages
             : collect();
 
         return view('admin.chat', [
